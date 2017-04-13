@@ -33,7 +33,7 @@
 
 int main(int args, char *arg[])
 {
-	if (init_my_assembler()< 0)
+	if (init_my_assembler() < 0)
 	{
 		printf("init_my_assembler: 프로그램 초기화에 실패 했습니다.\n");
 		return -1;
@@ -47,11 +47,8 @@ int main(int args, char *arg[])
 		printf(" assem_pass2: 패스2 과정에서 실패하였습니다.  \n");
 		return -1;
 	}
-	
-	token_parsing(0);
-	token_parsing(1);
-//	print_opcode();
-	//make_output("output") ; 
+
+	print_code();
 }
 /* -----------------------------------------------------------------------------------
 * 설명 : 프로그램 초기화를 위한 자료구조 생성 및 파일을 읽는 함수이다.
@@ -90,38 +87,13 @@ int init_my_assembler(void)
 
 static int assem_pass1(void)
 {
+
+
 	for (int i = 0; i < line_num; i++) {
 		token_parsing(i);
 	}
-	printf("\n");
-	for (int i = 0; i < line_num; i++) {		
-		//label 출력
-		if (token_table[i]->label[0] == '.')
-			continue;
-		else if (token_table[i]->label[0] != NULL)
-			printf("%s	", token_table[i]->label);
-		else
-			printf("\t");
 
-		//operator 출력
-		if (token_table[i]->operator[0] != NULL)
-			printf("%s	", token_table[i]->operator);
 
-		//operand 출력
-		if (token_table[i]->operand[0][0] != NULL) 
-			printf("%s", token_table[i]->operand[0]);
-		for (int j = 1; j < 3; j++) {
-			if(token_table[i]->operand[j][0] != NULL)
-				printf(", %s", token_table[i]->operand[j]);
-		}
-		printf("\t");
-		//opcode 출력
-		int isop = search_opcode(token_table[i]->operator);
-		if (isop >= 0) {
-			printf("\t\t%02X", inst_table[isop]->opcode);
-		}
-		printf("\n");
-	}
 	return 0;
 }
 
@@ -165,7 +137,7 @@ int init_inst_file(char *inst_file)
 
 	FILE *FILE = NULL;
 	char str[128];	//라인별로 한줄씩 저장할 임시 버퍼
-	char *p_token = malloc(sizeof(char)*128);	//토큰별
+	char *p_token = malloc(sizeof(char) * 128);	//토큰버퍼
 
 	FILE = fopen(inst_file, "r");
 	if (FILE != NULL) {
@@ -180,13 +152,13 @@ int init_inst_file(char *inst_file)
 			strcpy(inst_table[inst_index]->operator , p_token);	//operator에 토큰 저장
 			for (int i = 0; i < 3; i++) {
 				strcpy(p_token, strtok(NULL, "\t"));			//operator 이후의 토큰 분리하여 저장
-				if (i == 0)	//int
+				if (i == 0)
 					inst_table[inst_index]->format = atoi(p_token);	//format 저장
-				else if (i == 1) { //char
-					inst_table[inst_index]->opcode = strtol(p_token, NULL,16);
+				else if (i == 1) {
+					inst_table[inst_index]->opcode = strtol(p_token, NULL, 16);	//16진수 형태로 저장
 				}
-				else //int
-					inst_table[inst_index]->ops = atoi(p_token);	//op 갯수 저장
+				else
+					inst_table[inst_index]->ops = atoi(p_token);	//op랜드 갯수 저장
 			}
 			inst_index++;
 		}
@@ -196,13 +168,7 @@ int init_inst_file(char *inst_file)
 		return -1;
 	}
 
-		fclose(FILE);
-
-		//printf("inst_table 확인 ------- \n");
-		//for (int i = 0; i < inst_index; i++) {			//inst_table 메모리할당
-		//	printf("%s %d %X %d \n", inst_table[i]->operator, inst_table[i]->format, inst_table[i]->opcode, inst_table[i]->ops);
-		//}
-
+	fclose(FILE);
 	return 0;
 }
 
@@ -222,11 +188,11 @@ int init_input_file(char *input_file)
 		token_table[i] = (struct token_unit*)malloc(sizeof(struct token_unit));
 	}
 	line_num = 0;	//input파일을 저장할 line number
-	
+
 	FILE *FILE = NULL;
-	char str[128];
-	char *p_token = malloc(sizeof(char)*128);
-	
+	char str[128];	//라인별로 한줄씩 저장할 임시 버퍼
+	char *p_token = malloc(sizeof(char) * 128);	//토큰버퍼
+
 	FILE = fopen(input_file, "r");
 	if (FILE != NULL) {
 		while (!feof(FILE)) {
@@ -234,7 +200,7 @@ int init_input_file(char *input_file)
 
 			if (str[strlen(str) - 1] == '\n')	//마지막 line을 제외한 string의 개행을 null로 수정(마지막 line의 끝엔 개행이 없으므로)
 				str[strlen(str) - 1] = '\0';
-			
+
 			input_data[line_num] = (char*)malloc(sizeof(str));
 			strcpy(input_data[line_num], str);	//라인별 input data 저장
 			line_num++;
@@ -244,12 +210,8 @@ int init_input_file(char *input_file)
 		printf("ERROR : 파일을 읽지 못하였습니다. ");
 		return -1;
 	}
-	fclose(FILE);
 
-//	printf("input_data 확인 ------- \n");
-//	for (int i = 0; i < line_num - 1; i++) {			//inst_table 메모리할당
-//		printf("%s \n", input_data[i]);
-//	}
+	fclose(FILE);
 	return 0;
 }
 
@@ -265,38 +227,34 @@ int init_input_file(char *input_file)
 int token_parsing(int index)
 {
 	/* add your code here */
-	char *str = (char*)malloc(sizeof(char)*128);	//버퍼
-	char *p_token = (char*)malloc(sizeof(char)*50);		//토큰
+	char *str = (char*)malloc(sizeof(char) * 128);	//버퍼
+	char *p_token = (char*)malloc(sizeof(char) * 50);		//토큰
 	char *opbuf = (char*)malloc(30);				//operand 버퍼
 	char *op_token = (char*)malloc(10);				//operand 토큰
-	strcpy(str, input_data[index]);
-	
-	
-	
+	strcpy(str, input_data[index]);					//한 라인 씩 str변수에 복사
+
+
 	//label 파싱
+	token_table[index]->label = (char*)malloc(sizeof(char) * 7);	//label 메모리 할당
 	if (str[0] == '.') {		//주석처리
-		token_table[index]->label = (char*)malloc(strlen(p_token)+1);
-		token_table[index]->label[0] = '.';
+		token_table[index]->label[0] = '.';	//주석일 경우 label에 저장
 		return 0;
 	}
 	else if (str[0] != '\t') {	//첫번째 문자가 탭이 아닐 경우 (탭일 경우엔 label이 없음)
-		token_table[index]->label = (char*)malloc(strlen(p_token)+1);	//label 메모리할당
 		strcpy(p_token, strtok(str, "\t"));	//label 
 		strcpy(token_table[index]->label, p_token);
-
 	}
-	
+
 	//operator 파싱
 	if (str[0] == '\t') {		//label이 없는 line은 첫번째 토큰이 operator이므로 우선처리
-		token_table[index]->label = (char*)malloc(strlen(p_token)+1);	//label 메모리할당
 		token_table[index]->label[0] = '\0';
 		strcpy(p_token, strtok(str, "\t"));		//operator
-		token_table[index]->operator = (char*)malloc(strlen(p_token)+1);
+		token_table[index]->operator = (char*)malloc(strlen(p_token) + 1);
 		strcpy(token_table[index]->operator, p_token);
 	}
 	else {
 		strcpy(p_token, strtok(NULL, "\t"));
-		token_table[index]->operator = (char*)malloc(strlen(p_token)+1);
+		token_table[index]->operator = (char*)malloc(strlen(p_token) + 1);
 		strcpy(token_table[index]->operator, p_token);
 	}
 	if (strcmp(token_table[index]->operator, "RSUB") == 0) {	//RSUB일 경우 operand가 없고 comment만 있는 line이므로 예외처리
@@ -316,12 +274,12 @@ int token_parsing(int index)
 	}
 	else
 		opbuf = NULL;
-		
+
 	//comment 파싱
 	p_token = strtok(NULL, "\t");
-	if ( p_token != NULL) {			//comment가 있을 경우
-			token_table[index]->comment = (char*)malloc(strlen(p_token)+1);
-			strcpy(token_table[index]->comment, p_token);
+	if (p_token != NULL) {			//comment가 있을 경우
+		token_table[index]->comment = (char*)malloc(strlen(p_token) + 1);
+		strcpy(token_table[index]->comment, p_token);
 	}
 	else {							//comment가 없을 경우
 		token_table[index]->comment = (char*)malloc(sizeof(p_token));
@@ -333,25 +291,23 @@ int token_parsing(int index)
 		token_table[index]->operand[i] = (char*)malloc(8);
 		token_table[index]->operand[i][0] = '\0';
 	}
-	if (opbuf != NULL) {
+	if (opbuf != NULL) {		//operand가 존재
 		if (strchr(opbuf, ',') == NULL) {	//단일 operand
 			strcpy(token_table[index]->operand[0], opbuf);
 		}
 		else {
 			strcpy(op_token, strtok(opbuf, ","));		//1번째 operand
 			strcpy(token_table[index]->operand[0], op_token);
-			
+
 			strcpy(op_token, strtok(NULL, ","));		//2번째 operand
 			strcpy(token_table[index]->operand[1], op_token);
-			
+
 			op_token = strtok(NULL, ",");				//3번째 operand가 있는지 검사
 			if (op_token != NULL) {
 				strcpy(token_table[index]->operand[2], op_token);
 			}
 		}
 	}
-	else{			//operand가 없을 경우	
-	}	
 
 	return 0;
 }
@@ -370,7 +326,6 @@ int search_opcode(char *str)
 		if (strcmp(inst_table[i]->operator, str) == 0)
 			return i;
 	}
-	
 	return -1;
 }
 /* -----------------------------------------------------------------------------------
@@ -386,13 +341,45 @@ int search_opcode(char *str)
 void make_objectcode(char *file_name)
 {
 	/* add your code here */
-
 }
 
-void print_opcode() {
-	printf("input_data 확인 ------- \n");
-	for (int i = 0; i < line_num - 1; i++) {			//inst_table 메모리할당
-		printf("%s \n", input_data[i]);
+void print_code() {
+	int isop;	//serach_opcode return값을 받는 변수
+
+	for (int i = 0; i < line_num; i++) {
+		//label 출력
+		if (token_table[i]->label[0] == '.')		//주석은 개행 후 스킵
+			continue;
+		else if (token_table[i]->label[0] != '\0')
+			printf("%s	", token_table[i]->label);
+		else
+			printf("\t");
+
+		//operator 출력
+		if (token_table[i]->operator[0] != '\0')
+			printf("%s	", token_table[i]->operator);
+
+		//operand 출력
+		if (token_table[i]->operand[0][0] != '\0')
+			printf("%s", token_table[i]->operand[0]);
+		for (int j = 1; j < 3; j++) {
+			if (token_table[i]->operand[j][0] != '\0') {
+				printf(",%s", token_table[i]->operand[j]);
+			}
+		}
+		printf("\t");
+
+		//opcode 출력
+
+		if (token_table[i]->operator[0] == '+') {		//+가 붙는 extended일 경우
+			isop = search_opcode(&(token_table[i]->operator[1]));	//+ 다음 번지주소를 매개변수로 사용
+		}
+		else
+			isop = search_opcode(token_table[i]->operator);	//일반 operator
+		if (isop >= 0) {
+			printf("\t\t%02X", inst_table[isop]->opcode);	//해당 opcode 출력
+		}
+		printf("\n");
 	}
 }
 
