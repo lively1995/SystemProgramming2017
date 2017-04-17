@@ -17,8 +17,8 @@ struct inst_struct {
 	unsigned char opcode;
 	int ops;
 };
-typedef struct inst_struct inst_struct;
-inst_struct *inst_table[MAX_INST];
+typedef struct inst_struct inst;
+inst *inst_table[MAX_INST];
 int inst_index;
 
 /*
@@ -40,6 +40,7 @@ struct token_unit {
 	char *operator;
 	char *operand[MAX_OPERAND];
 	char *comment;
+	//char nixbpe; // 추후 프로젝트에서 사용된다.
 };
 
 typedef struct token_unit token;
@@ -65,12 +66,14 @@ static int locctr;
 
 static char *input_file;
 static char *output_file;
-
 int init_my_assembler(void);
-static int assem_pass1(void);
-static int assem_pass2(void);
 int init_inst_file(char *inst_file);
 int init_input_file(char *input_file);
+static int assem_pass1(void);
 int search_opcode(char *str);
-void make_objectcode(char *file_name);
-void print_code(void);
+void make_opcode_output(char *file_name);
+
+/* 추후 프로젝트에서 사용하게 되는 함수*/
+static int assem_pass2(void);
+void make_objectcode_output(char *file_name);
+

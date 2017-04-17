@@ -39,16 +39,27 @@ int main(int args, char *arg[])
 		return -1;
 	}
 
-	if (assem_pass1() < 0) {
-		printf("assem_pass1: 패스1 과정에서 실패하였습니다.  \n");
-		return -1;
-	}
-	if (assem_pass2() < 0) {
-		printf(" assem_pass2: 패스2 과정에서 실패하였습니다.  \n");
-		return -1;
+	for (int i = 0; i < line_num; i++) {
+		token_parsing(i);
 	}
 
-	print_code();
+	make_opcode_output("output");
+
+	/*
+	* 추후 프로젝트 1에서 사용되는 부분
+	*
+	if(assem_pass1() < 0 ){
+	printf("assem_pass1: 패스1 과정에서 실패하였습니다.  \n") ;
+	return -1 ;
+	}
+	if(assem_pass2() < 0 ){
+	printf(" assem_pass2: 패스2 과정에서 실패하였습니다.  \n") ;
+	return -1 ;
+	}
+
+	/*make_objectcode_output("output");
+	*/
+	return 0;
 }
 /* -----------------------------------------------------------------------------------
 * 설명 : 프로그램 초기화를 위한 자료구조 생성 및 파일을 읽는 함수이다.
@@ -71,49 +82,7 @@ int init_my_assembler(void)
 	return result;
 }
 
-/* -----------------------------------------------------------------------------------
-* 설명 : 어셈블리 코드를 위한 패스1과정을 수행하는 함수이다.
-*		   패스1에서는..
-*		   1. 프로그램 소스를 스캔하여 해당하는 토큰단위로 분리하여 프로그램 라인별 토큰
-*		   테이블을 생성한다.
-*
-* 매계 : 없음
-* 반환 : 정상 종료 = 0 , 에러 = < 0
-* 주의 : 현재 초기 버전에서는 에러에 대한 검사를 하지 않고 넘어간 상태이다.
-*	  따라서 에러에 대한 검사 루틴을 추가해야 한다.
-*
-* -----------------------------------------------------------------------------------
-*/
 
-static int assem_pass1(void)
-{
-
-
-	for (int i = 0; i < line_num; i++) {
-		token_parsing(i);
-	}
-
-
-	return 0;
-}
-
-/* -----------------------------------------------------------------------------------
-* 설명 : 어셈블리 코드를 기계어 코드로 바꾸기 위한 패스2 과정을 수행하는 함수이다.
-*		   패스 2에서는 프로그램을 기계어로 바꾸는 작업은 라인 단위로 수행된다.
-*		   다음과 같은 작업이 수행되어 진다.
-*		   1. 실제로 해당 어셈블리 명령어를 기계어로 바꾸는 작업을 수행한다.
-* 매계 : 없음
-* 반환 : 정상종료 = 0, 에러발생 = < 0
-* 주의 :
-* -----------------------------------------------------------------------------------
-*/
-
-static int assem_pass2(void)
-{
-
-	/* add your code here */
-	return 0;
-}
 /* -----------------------------------------------------------------------------------
 * 설명 : 머신을 위한 기계 코드목록 파일을 읽어 기계어 목록 테이블(inst_table)을
 *        생성하는 함수이다.
@@ -131,7 +100,7 @@ static int assem_pass2(void)
 int init_inst_file(char *inst_file)
 {
 	for (int i = 0; i < MAX_INST; i++) {			//inst_table 메모리할당
-		inst_table[i] = (struct inst_struct*)malloc(sizeof(inst_struct));
+		inst_table[i] = (struct inst*)malloc(sizeof(inst));
 	}
 	inst_index = 0;
 
@@ -323,11 +292,118 @@ int token_parsing(int index)
 int search_opcode(char *str)
 {
 	for (int i = 0; i < inst_index; i++) {
-		if (strcmp(inst_table[i]->operator, str) == 0)
+		if (str[0] == '+') {									//+가 붙는 extended일 경우
+			if (strcmp(inst_table[i]->operator, &str[1]) == 0)	//+ 다음 번지주소를 매개변수로 사용
+				return i;
+		}
+		else if(strcmp(inst_table[i]->operator, str) == 0)		//일반 operator
 			return i;
 	}
 	return -1;
 }
+/* ----------------------------------------------------------------------------------
+* 설명 : 입력된 문자열의 이름을 가진 파일에 프로그램의 결과를 저장하는 함수이다.
+*        여기서 출력되는 내용은 명령어 옆에 OPCODE가 기록된 표(과제 4번) 이다.
+* 매계 : 생성할 오브젝트 파일명
+* 반환 : 없음
+* 주의 : 만약 인자로 NULL값이 들어온다면 프로그램의 결과를 표준출력으로 보내어
+*        화면에 출력해준다.
+*        또한 과제 4번에서만 쓰이는 함수이므로 이후의 프로젝트에서는 사용되지 않는다.
+* -----------------------------------------------------------------------------------
+*/
+void make_opcode_output(char *file_name)
+{
+	FILE *FILE = NULL;
+	FILE = fopen(file_name, "w");
+	
+	if (FILE != NULL) {
+		int isop;	//serach_opcode return값을 받는 변수
+
+		for (int i = 0; i < line_num; i++) {
+			//label 출력
+			if (token_table[i]->label[0] == '.')		//주석은 개행 후 스킵
+				continue;
+			else if (token_table[i]->label[0] != '\0')
+				fprintf(FILE, "%s	", token_table[i]->label);
+			else
+				fprintf(FILE, "\t");
+
+			//operator 출력
+			if (token_table[i]->operator[0] != '\0')
+				fprintf(FILE, "%s	", token_table[i]->operator);
+
+			//operand 출력
+			if (token_table[i]->operand[0][0] != '\0')
+				fprintf(FILE, "%s", token_table[i]->operand[0]);
+			for (int j = 1; j < 3; j++) {
+				if (token_table[i]->operand[j][0] != '\0') {
+					fprintf(FILE, ",%s", token_table[i]->operand[j]);
+				}
+			}
+			fprintf(FILE, "\t");
+
+			//opcode 출력
+
+			isop = search_opcode(token_table[i]->operator);	//일반 operator
+			if (isop >= 0) {
+				fprintf(FILE, "\t\t%02X", inst_table[isop]->opcode);	//해당 opcode 출력
+			}
+			fprintf(FILE, "\n");
+		}
+	}
+	else {
+		printf("ERROR : 파일을 불러오지 못했습니다.");
+		exit(0);
+	}
+
+	fclose(FILE);
+}
+
+/* --------------------------------------------------------------------------------*
+* ------------------------- 추후 프로젝트에서 사용할 함수 --------------------------*
+* --------------------------------------------------------------------------------*/
+
+
+/* -----------------------------------------------------------------------------------
+* 설명 : 어셈블리 코드를 위한 패스1과정을 수행하는 함수이다.
+*		   패스1에서는..
+*		   1. 프로그램 소스를 스캔하여 해당하는 토큰단위로 분리하여 프로그램 라인별 토큰
+*		   테이블을 생성한다.
+*
+* 매계 : 없음
+* 반환 : 정상 종료 = 0 , 에러 = < 0
+* 주의 : 현재 초기 버전에서는 에러에 대한 검사를 하지 않고 넘어간 상태이다.
+*	  따라서 에러에 대한 검사 루틴을 추가해야 한다.
+*
+* -----------------------------------------------------------------------------------
+*/
+
+static int assem_pass1(void)
+{
+
+	
+
+	return 0;
+}
+
+/* -----------------------------------------------------------------------------------
+* 설명 : 어셈블리 코드를 기계어 코드로 바꾸기 위한 패스2 과정을 수행하는 함수이다.
+*		   패스 2에서는 프로그램을 기계어로 바꾸는 작업은 라인 단위로 수행된다.
+*		   다음과 같은 작업이 수행되어 진다.
+*		   1. 실제로 해당 어셈블리 명령어를 기계어로 바꾸는 작업을 수행한다.
+* 매계 : 없음
+* 반환 : 정상종료 = 0, 에러발생 = < 0
+* 주의 :
+* -----------------------------------------------------------------------------------
+*/
+
+static int assem_pass2(void)
+{
+
+	/* add your code here */
+	return 0;
+}
+
 /* -----------------------------------------------------------------------------------
 * 설명 : 입력된 문자열의 이름을 가진 파일에 프로그램의 결과를 저장하는 함수이다.
 * 매계 : 생성할 오브젝트 파일명
@@ -338,49 +414,7 @@ int search_opcode(char *str)
 * -----------------------------------------------------------------------------------
 */
 
-void make_objectcode(char *file_name)
+void make_objectcode_output(char *file_name)
 {
 	/* add your code here */
 }
-
-void print_code() {
-	int isop;	//serach_opcode return값을 받는 변수
-
-	for (int i = 0; i < line_num; i++) {
-		//label 출력
-		if (token_table[i]->label[0] == '.')		//주석은 개행 후 스킵
-			continue;
-		else if (token_table[i]->label[0] != '\0')
-			printf("%s	", token_table[i]->label);
-		else
-			printf("\t");
-
-		//operator 출력
-		if (token_table[i]->operator[0] != '\0')
-			printf("%s	", token_table[i]->operator);
-
-		//operand 출력
-		if (token_table[i]->operand[0][0] != '\0')
-			printf("%s", token_table[i]->operand[0]);
-		for (int j = 1; j < 3; j++) {
-			if (token_table[i]->operand[j][0] != '\0') {
-				printf(",%s", token_table[i]->operand[j]);
-			}
-		}
-		printf("\t");
-
-		//opcode 출력
-
-		if (token_table[i]->operator[0] == '+') {		//+가 붙는 extended일 경우
-			isop = search_opcode(&(token_table[i]->operator[1]));	//+ 다음 번지주소를 매개변수로 사용
-		}
-		else
-			isop = search_opcode(token_table[i]->operator);	//일반 operator
-		if (isop >= 0) {
-			printf("\t\t%02X", inst_table[isop]->opcode);	//해당 opcode 출력
-		}
-		printf("\n");
-	}
-}
-
-
