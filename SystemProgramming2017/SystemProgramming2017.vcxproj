@@ -19,10 +19,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="my_assembler.c" />
+    <ClCompile Include="my_assembler_141.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="my_assembler.h" />
+    <ClInclude Include="my_assembler_141.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{6C553746-754C-4D0F-BB2E-5842A1136CB7}</ProjectGuid>

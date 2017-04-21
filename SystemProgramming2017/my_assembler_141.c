@@ -19,7 +19,7 @@
 * my_assembler 프로그램의 의존적인 데이터들이 정의된 곳이다.
 */
 
-#include "my_assembler.h"
+#include "my_assembler_141.h"
 
 /* -----------------------------------------------------------------------------------
 * 설명 : 사용자로 부터 어셈블리 파일을 받아서 명령어의 OPCODE를 찾아 출력한다.
@@ -43,7 +43,7 @@ int main(int args, char *arg[])
 		token_parsing(i);
 	}
 
-	make_opcode_output("output");
+	make_opcode_output("output_141");
 
 	/*
 	* 추후 프로젝트 1에서 사용되는 부분
@@ -296,7 +296,7 @@ int search_opcode(char *str)
 			if (strcmp(inst_table[i]->operator, &str[1]) == 0)	//+ 다음 번지주소를 매개변수로 사용
 				return i;
 		}
-		else if(strcmp(inst_table[i]->operator, str) == 0)		//일반 operator
+		else if (strcmp(inst_table[i]->operator, str) == 0)		//일반 operator
 			return i;
 	}
 	return -1;
@@ -315,7 +315,7 @@ void make_opcode_output(char *file_name)
 {
 	FILE *FILE = NULL;
 	FILE = fopen(file_name, "w");
-	
+
 	if (FILE != NULL) {
 		int isop;	//serach_opcode return값을 받는 변수
 
@@ -381,7 +381,7 @@ void make_opcode_output(char *file_name)
 static int assem_pass1(void)
 {
 
-	
+
 
 	return 0;
 }
