@@ -35,30 +35,23 @@ int main(int args, char *arg[])
 {
 	if (init_my_assembler() < 0)
 	{
-		printf("init_my_assembler: 프로그램 초기화에 실패 했습니다.\n");
+		printf("init_my_assembler: Failed to initialize of program.\n");
 		return -1;
 	}
-
-	for (int i = 0; i < line_num; i++) {
-		token_parsing(i);
-	}
-
-	make_opcode_output("output_141");
-
-	/*
-	* 추후 프로젝트 1에서 사용되는 부분
-	*
+	
 	if(assem_pass1() < 0 ){
-	printf("assem_pass1: 패스1 과정에서 실패하였습니다.  \n") ;
+	printf("assem_pass1: Failed to pass1 process. \n") ;
 	return -1 ;
 	}
 	if(assem_pass2() < 0 ){
-	printf(" assem_pass2: 패스2 과정에서 실패하였습니다.  \n") ;
+	printf(" assem_pass2: Failed to pass2 process. \n") ;
 	return -1 ;
 	}
+	
+	make_opcode_output("output_141");
 
-	/*make_objectcode_output("output");
-	*/
+	//make_objectcode_output("output");
+	
 	return 0;
 }
 /* -----------------------------------------------------------------------------------
@@ -133,7 +126,7 @@ int init_inst_file(char *inst_file)
 		}
 	}
 	else {
-		printf("ERROR : 파일을 읽지 못하였습니다. ");
+		printf("ERROR : Failed to Read file. ");
 		return -1;
 	}
 
@@ -176,7 +169,7 @@ int init_input_file(char *input_file)
 		}
 	}
 	else {
-		printf("ERROR : 파일을 읽지 못하였습니다. ");
+		printf("ERROR : Failed to Read file. ");
 		return -1;
 	}
 
@@ -202,15 +195,18 @@ int token_parsing(int index)
 	char *op_token = (char*)malloc(10);				//operand 토큰
 	strcpy(str, input_data[index]);					//한 라인 씩 str변수에 복사
 
+	token_table[index]->Addr = -1;				//인스트럭션 주소 초기화
 
 	//label 파싱
 	token_table[index]->label = (char*)malloc(sizeof(char) * 7);	//label 메모리 할당
 	if (str[0] == '.') {		//주석처리
 		token_table[index]->label[0] = '.';	//주석일 경우 label에 저장
+		token_table[index]->operator = (char*)malloc(strlen(p_token) + 1);
+//		token_table[index]->operator[0] = '.';
 		return 0;
 	}
 	else if (str[0] != '\t') {	//첫번째 문자가 탭이 아닐 경우 (탭일 경우엔 label이 없음)
-		strcpy(p_token, strtok(str, "\t"));	//label 
+		strcpy(p_token, strtok(str, "\t"));	//label
 		strcpy(token_table[index]->label, p_token);
 	}
 
@@ -231,7 +227,7 @@ int token_parsing(int index)
 		token_table[index]->comment = (char*)malloc(strlen(p_token) + 1);
 		strcpy(token_table[index]->comment, p_token);
 
-		for (int i = 0; i < 3; i++) {		//초기화
+		for (int i = 0; i < MAX_OPERAND; i++) {		//초기화
 			token_table[index]->operand[i] = (char*)malloc(8);
 			token_table[index]->operand[i][0] = '\0';
 		}
@@ -256,7 +252,7 @@ int token_parsing(int index)
 	}
 
 	//operand 파싱
-	for (int i = 0; i < 3; i++) {		//초기화
+	for (int i = 0; i < MAX_OPERAND; i++) {		//초기화
 		token_table[index]->operand[i] = (char*)malloc(8);
 		token_table[index]->operand[i][0] = '\0';
 	}
@@ -335,7 +331,7 @@ void make_opcode_output(char *file_name)
 			//operand 출력
 			if (token_table[i]->operand[0][0] != '\0')
 				fprintf(FILE, "%s", token_table[i]->operand[0]);
-			for (int j = 1; j < 3; j++) {
+			for (int j = 1; j < MAX_OPERAND; j++) {
 				if (token_table[i]->operand[j][0] != '\0') {
 					fprintf(FILE, ",%s", token_table[i]->operand[j]);
 				}
@@ -352,18 +348,48 @@ void make_opcode_output(char *file_name)
 		}
 	}
 	else {
-		printf("ERROR : 파일을 불러오지 못했습니다.");
+		printf("ERROR : Failed to Read file.");
 		exit(0);
 	}
 
 	fclose(FILE);
 }
 
-/* --------------------------------------------------------------------------------*
-* ------------------------- 추후 프로젝트에서 사용할 함수 --------------------------*
-* --------------------------------------------------------------------------------*/
+/* -----------------------------------------------------------------------------------
+* 설명 : 입력 문자열이 SYMTAB에 들어있는지 검사하는 함수이다.
+* 매계 : 토큰 단위로 구분된 label
+* 반환 : 정상종료 = 해당 symbol의 인덱스, 에러 < 0
+* 주의 :
+*
+* -----------------------------------------------------------------------------------
+*/
 
+int search_symbol(char *str)
+{
+	for (int i = 0; i < token_line; i++) {
+		if (strcmp(sym_table[i].symbol, str) == 0)
+			return i;
+	}
+	return -1;
+}
 
+/* -----------------------------------------------------------------------------------
+* 설명 : 입력 문자열이 LITTAB에 들어있는지 검사하는 함수이다.
+* 매계 : 토큰 단위로 구분된 literal
+* 반환 : 정상종료 = 해당 literal의 인덱스, 에러 < 0
+* 주의 :
+*
+* -----------------------------------------------------------------------------------
+*/
+
+int search_literal(char *str)
+{
+	for (int i = 0; i < token_line; i++) {
+		if (strcmp(lit_table[i].literal, str) == 0)
+			return i;
+	}
+	return -1;
+}
 /* -----------------------------------------------------------------------------------
 * 설명 : 어셈블리 코드를 위한 패스1과정을 수행하는 함수이다.
 *		   패스1에서는..
@@ -377,12 +403,159 @@ void make_opcode_output(char *file_name)
 *
 * -----------------------------------------------------------------------------------
 */
-
 static int assem_pass1(void)
-{
+{	
+	token_line = 0;
+	int startaddr = 0, opnum = 0, symnum, j = 0, k = 0, csectnum=0;
+	char *str = (char*)malloc(sizeof(char) * 128);	//버퍼
+	char *p_token = (char*)malloc(sizeof(char) * 50);		//토큰
 
+	for (int i = 0; i < line_num; i++) {
+		if (token_parsing(i) < 0) {									//토큰 테이블 작성
+			return -1;
+		}
+		token_line++;
+	}
 
+	for (int i = 0; i < token_line; i++) {							//리터럴테이블 초기화
+		lit_table[i].addr = -1;
+		lit_table[i].literal[0] = '\0';
+	}
 
+	int i=0;
+	
+	if (strcmp(token_table[i]->operator, "START") == 0) {		//프로그램 시작 시
+		locctr = atoi(token_table[i]->operand[0]); //LOCCTR start 주소로 초기화
+		startaddr = locctr;
+		token_table[i]->Addr = locctr;
+		i++;
+	}
+	else {
+		locctr = 0;
+		}
+	while(strcmp(token_table[i]->operator, "END") != 0){					//프로그램이 끝날 때 까지 루프
+		if (token_table[i]->label[0] != '.') {	//주석이 아닐 경우 
+			if (token_table[i]->label[0] != '\0') {				//label이 존재
+				symnum = search_symbol(token_table[i]->label);
+				if (symnum < 0) {		//SYMTAB에 존재하지 않을 경우				
+					strcpy(sym_table[j].symbol, token_table[i]->label);			//심볼테이블 라벨 저장
+					if (sym_table[symnum].section == csectnum)
+						sym_table[j].addr = locctr;									//심볼테이블 주소 저장
+					sym_table[j].section = csectnum;							//심볼테이블 섹션번호 저장
+					token_table[i]->Addr =locctr;					//instruction 주소 저장
+					j++;
+				}
+				else {             //SYMTAB에 label이 존재할 경우
+					if (sym_table[symnum].section == csectnum)
+						sym_table[symnum].addr = locctr;			//심볼테이블 주소 저장				//RDREC 주소 저장된다!
+					token_table[i]->Addr = locctr;	//instruction 주소 저장		
+				}
+			}
+			else {		//label이 없을 경우
+				if (strcmp(token_table[i]->operator, "EXTDEF") == 0 || strcmp(token_table[i]->operator, "EXTREF") == 0) {	//외부참조 EXTDEF일 경우
+					symnum = 0;
+					for (int idx = 0; idx < MAX_OPERAND; idx++) {
+						if (token_table[i]->operand[idx][0] != '\0') {	//operand 존재할 경우
+							symnum = search_symbol(token_table[i]->operand[idx]);
+							if (symnum < 0) {		//SYMTAB에 존재하지 않을 경우				
+								strcpy(sym_table[j].symbol, token_table[i]->operand[idx]);			//심볼테이블 라벨 저장								
+								sym_table[j].section = csectnum;		//섹션번호 저장
+								j++;
+							}
+							else {		//SYMTAB에 존재할 경우
+								if(sym_table[symnum].section == csectnum)	//현재 파싱하는 섹션과 심볼테이블에 EXTDEF에 의해 저장된 operand 섹션이 일치할 경우
+									sym_table[symnum].addr = locctr;	//해당 심볼 addr에 주소 저장
+								
+							}
+						}
+					}
+				}
+				//else if (strcmp(token_table[i]->operator, "EXTREF") == 0) {	//외부참조 EXTREF일 경우
+				//	symnum = 0;
+				//	for (int idx = 0; idx < MAX_OPERAND; idx++) {
+				//		if (token_table[i]->operand[idx][0] != '\0') {	//operand 존재할 경우
+				//			symnum = search_symbol(token_table[i]->operand[idx]);
+				//			if (symnum < 0) {		//SYMTAB에 존재하지 않을 경우				
+				//				strcpy(sym_table[j].symbol, token_table[i]->operand[idx]);			//심볼테이블 라벨 저장								
+				//				sym_table[j].section = ++csectnum;
+				//				j++;
+				//			}
+				//			else {		//SYMTAB에 존재할 경우
+				//				sym_table[symnum].addr = locctr;	//해당 심볼 addr에 주소 저장
+				//			}
+				//		}
+				//	}
+				//}
+				else if (strcmp(token_table[i]->operator, "LTORG") == 0) {		//LTORG 발견 시 LITTAB참조
+					lit_table[0].addr = locctr;			//해당 literal주소 등록
+														//strlen(lit_table[0].literal)-4;	//'' 사이 값 어떻게 불러올까?
+					locctr += strlen(lit_table[0].literal) - 4;	//EOF 길이만큼 +
+				}
+				else
+					token_table[i]->Addr = locctr;
+			}
+			
+			opnum = search_opcode(token_table[i]->operator);
+			if (opnum >= 0) {		//명령어가 맞으면
+				if (inst_table[opnum]->format == 34) {		//
+					if (token_table[i]->operator[0] == '+') {		//+가 붙은 4형식일 경우
+						locctr += 4;
+					}
+					else
+						locctr += 3;
+				}
+				else if (inst_table[opnum]->format == 2) {	//2형식이면
+					locctr += 2;
+				}
+				else	//1형식이면
+					locctr += 1;
+			}
+			else if (strcmp(token_table[i]->operator, "WORD") == 0) {
+				locctr += 3;
+			}
+			else if (strcmp(token_table[i]->operator, "RESW") == 0) {
+				 locctr += 3*(atoi(token_table[i]->operand[0]));
+			}
+			else if (strcmp(token_table[i]->operator, "RESB") == 0) {
+				locctr += atoi(token_table[i]->operand[0]);
+			}
+			else if (strcmp(token_table[i]->operator, "BYTE") == 0) {
+				locctr += 1;
+			}
+			else if (strcmp(token_table[i]->operator, "CSECT") == 0) {
+				locctr = 0;			//새 섹션 시작 시 LOCCTR 0으로 초기화
+				sym_table[search_symbol(token_table[i]->label)].section = ++csectnum;
+				sym_table[search_symbol(token_table[i]->label)].addr = 0;
+				token_table[i]->Addr = locctr;	//인스트럭션 주소 초기화
+			}
+			else if (strcmp(token_table[i]->operator, "BYTE") == 0) {
+				locctr += 1;
+			}else if (strcmp(token_table[i]->operator, "EQU") == 0){
+				if (token_table[i]->operand[0][0] != '*') {			//*(현재 locctr 값)이 아니라면
+					char op_token[20];			//임시 토큰
+					char *tmp=(char*)malloc(10);	
+					int opaddr1, opaddr2;
+					strcpy(op_token, token_table[i]->operand[0]);	//값을 계산해야하는 operand를 버퍼에 복사
+					tmp = strtok(op_token, "+-*/");					//사칙연산기호를 기준으로 토큰 분리
+					opaddr1 = sym_table[search_symbol(tmp)].addr;	//첫번째 operand의 주소를 찾아 opaddr1에 대입(SYMTAB활용)
+					tmp = strtok(NULL, "+-*/");						//위와 동일
+					opaddr2 = sym_table[search_symbol(tmp)].addr;
+					token_table[i]->Addr = opaddr1 - opaddr2;		//연산 후의 주소값을 해당 토큰 인스트럭션 주소에 대입
+				}
+			}
+			
+			if (token_table[i]->operand[0][0] == '=') {
+				int litnum= search_literal(token_table[i]->operand[0]);
+				if (litnum <0) {	//LITTAB에 없을 경우 (중복 방지)
+					strcpy(lit_table[k].literal, token_table[i]->operand[0]);	//LITTAB에 '='로 시작하는 literal 등록
+					k++;
+				}
+			}
+		}
+		i++;
+	}
+
+	my_print();
 	return 0;
 }
 
@@ -417,4 +590,68 @@ static int assem_pass2(void)
 void make_objectcode_output(char *file_name)
 {
 	/* add your code here */
+}
+
+void my_print() {
+	int isop, issym, j=0, count=0, litcnt=0;
+
+	for (int i = 0; i < line_num; i++) {
+		if (token_table[i]->label[0] == '.')		//주석은 개행 후 스킵
+			continue;
+		
+		//Addr 출력
+		if (token_table[i]->Addr != -1) {
+			if (strcmp(token_table[i]->operator, "CSECT") == 0) {
+				printf("\t");
+			}
+			else
+				printf("%04X\t", token_table[i]->Addr);
+
+		}
+		else
+			printf("\t");
+		
+		//label 출력
+		//if (token_table[i]->label[0] == '.')		//주석은 개행 후 스킵
+		//	continue;
+		if (token_table[i]->label[0] != '\0')
+			printf("%s	", token_table[i]->label);
+		else
+			printf("\t");
+
+		//operator 출력
+		
+		if (token_table[i]->operator[0] != '\0') {
+			printf("%s	", token_table[i]->operator);
+			if (strcmp(token_table[i]->operator, "LTORG") == 0) {		//LTORG 인 경우
+				for (; j < token_line; j++) {
+					if (lit_table[j].addr != -1) {
+						printf("\n%04X\t*\t%s\n", lit_table[j].addr, lit_table[j].literal); //LITTAB에 주소값이 배정된 모든 리터럴 출력
+						litcnt++;
+					}
+				}
+				continue;
+			}
+		}
+		//operand 출력
+		if (token_table[i]->operand[0][0] != '\0')
+			printf("%s", token_table[i]->operand[0]);
+		for (int j = 1; j < MAX_OPERAND; j++) {
+			if (token_table[i]->operand[j][0] != '\0') {
+				printf(",%s", token_table[i]->operand[j]);
+			}
+		}
+		printf("\t");
+
+		if (strcmp(token_table[i]->operator, "END") == 0) { //프로그램이 끝났을 경우 literal 출력
+			int tmp_locctr = 0;		//임시 로케이션 카운터
+			for (j = litcnt; j < token_line; j++) {
+				if (lit_table[j].literal[0] != '\0') {
+					tmp_locctr += token_table[i - 1]->Addr + 3;	//보통 RSUB으로 끝나므로 3형식으로 판단
+					printf("\n%04X\t*\t%s\n", tmp_locctr, lit_table[j].literal); //LITTAB에 주소값이 배정된 모든 리터럴 출력
+				}
+			}
+		}
+		printf("\n");
+	}
 }

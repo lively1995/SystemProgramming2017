@@ -36,11 +36,12 @@ int label_num;
 * nixbpe는 8bit 중 하위 6개의 bit를 이용하여 n,i,x,b,p,e를 표시한다.
 */
 struct token_unit {
+	int Addr;
 	char *label;
 	char *operator;
 	char *operand[MAX_OPERAND];
 	char *comment;
-	//char nixbpe; // 추후 프로젝트에서 사용된다.
+	char nixbpe;
 };
 
 typedef struct token_unit token;
@@ -56,10 +57,23 @@ static int token_line;
 struct symbol_unit {
 	char symbol[10];
 	int addr;
+	int section;
 };
 
 typedef struct symbol_unit symbol;
 symbol sym_table[MAX_LINES];
+
+
+/*
+* literal을 관리하는 구조체이다.
+* 리터럴 테이블은 리터럴 이름, 리터럴의 위치로 구성된다.
+*/
+struct literal_unit {
+	char literal[10];
+	int addr;
+};
+typedef struct literal_unit literal;
+literal lit_table[MAX_LINES];
 
 static int locctr;
 //--------------
@@ -70,10 +84,10 @@ int init_my_assembler(void);
 int init_inst_file(char *inst_file);
 int init_input_file(char *input_file);
 static int assem_pass1(void);
-int search_opcode(char *str);
-void make_opcode_output(char *file_name);
-
-/* 추후 프로젝트에서 사용하게 되는 함수*/
 static int assem_pass2(void);
+int search_opcode(char *str);
+int search_symbol(char *str);
+int search_literal(char *str);
+void make_opcode_output(char *file_name);
 void make_objectcode_output(char *file_name);
-
+void my_print(void);
