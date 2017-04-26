@@ -406,7 +406,9 @@ int search_literal(char *str)
 static int assem_pass1(void)
 {	
 	token_line = 0;
+	litcnt = 0;
 	int startaddr = 0, opnum = 0, symnum, j = 0, k = 0, csectnum=0;
+	char litbuf[5];
 	char *str = (char*)malloc(sizeof(char) * 128);	//버퍼
 	char *p_token = (char*)malloc(sizeof(char) * 50);		//토큰
 
@@ -470,26 +472,12 @@ static int assem_pass1(void)
 						}
 					}
 				}
-				//else if (strcmp(token_table[i]->operator, "EXTREF") == 0) {	//외부참조 EXTREF일 경우
-				//	symnum = 0;
-				//	for (int idx = 0; idx < MAX_OPERAND; idx++) {
-				//		if (token_table[i]->operand[idx][0] != '\0') {	//operand 존재할 경우
-				//			symnum = search_symbol(token_table[i]->operand[idx]);
-				//			if (symnum < 0) {		//SYMTAB에 존재하지 않을 경우				
-				//				strcpy(sym_table[j].symbol, token_table[i]->operand[idx]);			//심볼테이블 라벨 저장								
-				//				sym_table[j].section = ++csectnum;
-				//				j++;
-				//			}
-				//			else {		//SYMTAB에 존재할 경우
-				//				sym_table[symnum].addr = locctr;	//해당 심볼 addr에 주소 저장
-				//			}
-				//		}
-				//	}
-				//}
 				else if (strcmp(token_table[i]->operator, "LTORG") == 0) {		//LTORG 발견 시 LITTAB참조
-					lit_table[0].addr = locctr;			//해당 literal주소 등록
-														//strlen(lit_table[0].literal)-4;	//'' 사이 값 어떻게 불러올까?
-					locctr += strlen(lit_table[0].literal) - 4;	//EOF 길이만큼 +
+					while(lit_table[litcnt].literal[0] != '\0') {	//LTORG 발견까지 LITTAB에 등록된 리터럴 조회 
+						lit_table[litcnt].addr = locctr;			//해당 literal주소 등록
+						locctr += lit_table[litcnt].size;	//literal의 값
+						litcnt++;
+					}
 				}
 				else
 					token_table[i]->Addr = locctr;
@@ -533,29 +521,69 @@ static int assem_pass1(void)
 			}else if (strcmp(token_table[i]->operator, "EQU") == 0){
 				if (token_table[i]->operand[0][0] != '*') {			//*(현재 locctr 값)이 아니라면
 					char op_token[20];			//임시 토큰
-					char *tmp=(char*)malloc(10);	
+					char *tmp = (char*)malloc(10);
 					int opaddr1, opaddr2;
 					strcpy(op_token, token_table[i]->operand[0]);	//값을 계산해야하는 operand를 버퍼에 복사
-					tmp = strtok(op_token, "+-*/");					//사칙연산기호를 기준으로 토큰 분리
-					opaddr1 = sym_table[search_symbol(tmp)].addr;	//첫번째 operand의 주소를 찾아 opaddr1에 대입(SYMTAB활용)
-					tmp = strtok(NULL, "+-*/");						//위와 동일
-					opaddr2 = sym_table[search_symbol(tmp)].addr;
-					token_table[i]->Addr = opaddr1 - opaddr2;		//연산 후의 주소값을 해당 토큰 인스트럭션 주소에 대입
+					if (strchr(op_token, '+')) {                    //+식일 경우
+						tmp = strtok(op_token, "+");					//연산기호를 기준으로 토큰 분리
+						opaddr1 = sym_table[search_symbol(tmp)].addr;	//첫번째 operand의 주소를 찾아 opaddr1에 대입(SYMTAB활용)
+						tmp = strtok(NULL, "+");						//위와 동일
+						opaddr2 = sym_table[search_symbol(tmp)].addr;
+						token_table[i]->Addr = opaddr1 - opaddr2;		//연산 후의 주소값을 해당 토큰 인스트럭션 주소에 대입
+						sym_table[search_symbol(tmp)].addr = token_table[i]->Addr;	//해당 심볼의 주소에 대입
+					}
+					else if (strchr(op_token, '-')) {               //-식일 경우
+						tmp = strtok(op_token, "-");					//연산기호를 기준으로 토큰 분리
+						opaddr1 = sym_table[search_symbol(tmp)].addr;	//첫번째 operand의 주소를 찾아 opaddr1에 대입(SYMTAB활용)
+						tmp = strtok(NULL, "-");						//위와 동일
+						opaddr2 = sym_table[search_symbol(tmp)].addr;
+						token_table[i]->Addr = opaddr1 - opaddr2;		//연산 후의 주소값을 해당 토큰 인스트럭션 주소에 대입
+						sym_table[search_symbol(tmp)].addr = token_table[i]->Addr; //해당 심볼의 주소에 대입
+					}
 				}
 			}
-			
+			int m = 3, n=0;
 			if (token_table[i]->operand[0][0] == '=') {
 				int litnum= search_literal(token_table[i]->operand[0]);
-				if (litnum <0) {	//LITTAB에 없을 경우 (중복 방지)
+				if (litnum < 0) {	//LITTAB에 없을 경우 (중복 방지)
 					strcpy(lit_table[k].literal, token_table[i]->operand[0]);	//LITTAB에 '='로 시작하는 literal 등록
+					
+					while (lit_table[k].literal[m] != '\'') {				//=C또는 =X' 이후(배열[3]부터) '이 나올때까지 
+							litbuf[n++] = lit_table[k].literal[m++];		//한 캐릭터씩 litbuf에 저장
+					}
+					litbuf[n] = '\0';										//끝에 null문자 추가
+					strcpy(lit_table[k].litdata, litbuf);					//literal Data를 추출하여 테이블에 저장
+					if (strchr(lit_table[k].literal, 'C'))
+						lit_table[k].size = strlen(lit_table[k].litdata); //=C일 경우 캐릭터이므로 1글자당 1바이트
+					else
+						lit_table[k].size = (strlen(lit_table[k].litdata) - 1); //=X일 경우 숫자 2캐릭터당 1바이트
 					k++;
 				}
+				
 			}
 		}
 		i++;
 	}
 
-	my_print();
+	int formatnum;
+	if (strcmp(token_table[token_line-1]->operator, "END") == 0) { //프로그램이 끝났을 경우 LITTAB에 리터럴 주소 등록
+		int tmp_locctr = 0;		//임시 로케이션 카운터
+		for (j = litcnt; j < token_line; j++) {
+			if (lit_table[j].literal[0] != '\0') {
+				tmp_locctr += token_table[token_line - 2]->Addr;	//END 이전 명령어 주소값
+				formatnum = inst_table[token_line - 2]->format;		//ENd 이전 명령어의 형식 크기 확인
+				if (formatnum == 34) {		//3,4형식
+					tmp_locctr += 3;
+				}
+				else if (formatnum == 2) {  //2형식
+					tmp_locctr += 2;
+				}
+				lit_table[j].addr = tmp_locctr;
+			}
+		}
+	}
+
+	my_print(litcnt);
 	return 0;
 }
 
@@ -592,8 +620,8 @@ void make_objectcode_output(char *file_name)
 	/* add your code here */
 }
 
-void my_print() {
-	int isop, issym, j=0, count=0, litcnt=0;
+void my_print(int litcnt) {
+	int isop, issym, j=0, count=0;
 
 	for (int i = 0; i < line_num; i++) {
 		if (token_table[i]->label[0] == '.')		//주석은 개행 후 스킵
@@ -624,10 +652,9 @@ void my_print() {
 		if (token_table[i]->operator[0] != '\0') {
 			printf("%s	", token_table[i]->operator);
 			if (strcmp(token_table[i]->operator, "LTORG") == 0) {		//LTORG 인 경우
-				for (; j < token_line; j++) {
+				for (; j < litcnt; j++) {
 					if (lit_table[j].addr != -1) {
 						printf("\n%04X\t*\t%s\n", lit_table[j].addr, lit_table[j].literal); //LITTAB에 주소값이 배정된 모든 리터럴 출력
-						litcnt++;
 					}
 				}
 				continue;
@@ -643,12 +670,11 @@ void my_print() {
 		}
 		printf("\t");
 
+		//END 후 literal 출력
 		if (strcmp(token_table[i]->operator, "END") == 0) { //프로그램이 끝났을 경우 literal 출력
-			int tmp_locctr = 0;		//임시 로케이션 카운터
 			for (j = litcnt; j < token_line; j++) {
 				if (lit_table[j].literal[0] != '\0') {
-					tmp_locctr += token_table[i - 1]->Addr + 3;	//보통 RSUB으로 끝나므로 3형식으로 판단
-					printf("\n%04X\t*\t%s\n", tmp_locctr, lit_table[j].literal); //LITTAB에 주소값이 배정된 모든 리터럴 출력
+					printf("\n%04X\t*\t%s\n", lit_table[j].addr, lit_table[j].literal); //LITTAB에 주소값이 배정된 모든 리터럴 출력
 				}
 			}
 		}

@@ -71,9 +71,12 @@ symbol sym_table[MAX_LINES];
 struct literal_unit {
 	char literal[10];
 	int addr;
+	char litdata[10];
+	int size;
 };
 typedef struct literal_unit literal;
 literal lit_table[MAX_LINES];
+int litcnt;
 
 static int locctr;
 //--------------
@@ -90,4 +93,4 @@ int search_symbol(char *str);
 int search_literal(char *str);
 void make_opcode_output(char *file_name);
 void make_objectcode_output(char *file_name);
-void my_print(void);
+void my_print(int);
