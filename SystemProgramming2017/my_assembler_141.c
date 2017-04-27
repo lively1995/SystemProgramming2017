@@ -538,7 +538,7 @@ static int assem_pass1(void)
 						tmp = strtok(NULL, "-");						//위와 동일
 						opaddr2 = sym_table[search_symbol(tmp)].addr;
 						token_table[i]->Addr = opaddr1 - opaddr2;		//연산 후의 주소값을 해당 토큰 인스트럭션 주소에 대입
-						sym_table[search_symbol(tmp)].addr = token_table[i]->Addr; //해당 심볼의 주소에 대입
+						sym_table[search_symbol(token_table[i]->label)].addr = token_table[i]->Addr; //해당 심볼의 주소에 대입
 					}
 				}
 			}
