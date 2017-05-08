@@ -38,20 +38,19 @@ int main(int args, char *arg[])
 		printf("init_my_assembler: Failed to initialize of program.\n");
 		return -1;
 	}
-	
-	if(assem_pass1() < 0 ){
-	printf("assem_pass1: Failed to pass1 process. \n") ;
-	return -1 ;
-	}
-	if(assem_pass2() < 0 ){
-	printf(" assem_pass2: Failed to pass2 process. \n") ;
-	return -1 ;
-	}
-	
-	make_opcode_output("output_141");
 
-	//make_objectcode_output("output");
-	
+	if (assem_pass1() < 0) {
+		printf("assem_pass1: Failed to pass1 process. \n");
+		return -1;
+	}
+	if (assem_pass2() < 0) {
+		printf(" assem_pass2: Failed to pass2 process. \n");
+		return -1;
+	}
+
+	my_print(litcnt);
+	make_objectcode_output("output_141");
+
 	return 0;
 }
 /* -----------------------------------------------------------------------------------
@@ -202,7 +201,6 @@ int token_parsing(int index)
 	if (str[0] == '.') {		//주석처리
 		token_table[index]->label[0] = '.';	//주석일 경우 label에 저장
 		token_table[index]->operator = (char*)malloc(strlen(p_token) + 1);
-//		token_table[index]->operator[0] = '.';
 		return 0;
 	}
 	else if (str[0] != '\t') {	//첫번째 문자가 탭이 아닐 경우 (탭일 경우엔 label이 없음)
@@ -297,63 +295,6 @@ int search_opcode(char *str)
 	}
 	return -1;
 }
-/* ----------------------------------------------------------------------------------
-* 설명 : 입력된 문자열의 이름을 가진 파일에 프로그램의 결과를 저장하는 함수이다.
-*        여기서 출력되는 내용은 명령어 옆에 OPCODE가 기록된 표(과제 4번) 이다.
-* 매계 : 생성할 오브젝트 파일명
-* 반환 : 없음
-* 주의 : 만약 인자로 NULL값이 들어온다면 프로그램의 결과를 표준출력으로 보내어
-*        화면에 출력해준다.
-*        또한 과제 4번에서만 쓰이는 함수이므로 이후의 프로젝트에서는 사용되지 않는다.
-* -----------------------------------------------------------------------------------
-*/
-void make_opcode_output(char *file_name)
-{
-	FILE *FILE = NULL;
-	FILE = fopen(file_name, "w");
-
-	if (FILE != NULL) {
-		int isop;	//serach_opcode return값을 받는 변수
-
-		for (int i = 0; i < line_num; i++) {
-			//label 출력
-			if (token_table[i]->label[0] == '.')		//주석은 개행 후 스킵
-				continue;
-			else if (token_table[i]->label[0] != '\0')
-				fprintf(FILE, "%s	", token_table[i]->label);
-			else
-				fprintf(FILE, "\t");
-
-			//operator 출력
-			if (token_table[i]->operator[0] != '\0')
-				fprintf(FILE, "%s	", token_table[i]->operator);
-
-			//operand 출력
-			if (token_table[i]->operand[0][0] != '\0')
-				fprintf(FILE, "%s", token_table[i]->operand[0]);
-			for (int j = 1; j < MAX_OPERAND; j++) {
-				if (token_table[i]->operand[j][0] != '\0') {
-					fprintf(FILE, ",%s", token_table[i]->operand[j]);
-				}
-			}
-			fprintf(FILE, "\t");
-
-			//opcode 출력
-
-			isop = search_opcode(token_table[i]->operator);	//일반 operator
-			if (isop >= 0) {
-				fprintf(FILE, "\t\t%02X", inst_table[isop]->opcode);	//해당 opcode 출력
-			}
-			fprintf(FILE, "\n");
-		}
-	}
-	else {
-		printf("ERROR : Failed to Read file.");
-		exit(0);
-	}
-
-	fclose(FILE);
-}
 
 /* -----------------------------------------------------------------------------------
 * 설명 : 입력 문자열이 SYMTAB에 들어있는지 검사하는 함수이다.
@@ -374,6 +315,25 @@ int search_symbol(char *str)
 }
 
 /* -----------------------------------------------------------------------------------
+* 설명 : 입력 문자열 SYMTAB에 들어있는지,현 섹션과 일치하는지 검사하는 함수이다.
+* 매계 : 토큰 단위로 구분된 label, 현섹션번호
+* 반환 : 정상종료 = 해당 symbol의 인덱스, 에러 < 0
+* 주의 :
+*
+* -----------------------------------------------------------------------------------
+*/
+
+int search_symbol2(char *str, int sect)
+{
+	for (int i = 0; i < token_line; i++) {
+		if (strcmp(sym_table[i].symbol, str) == 0) {
+			if (sym_table[i].section == sect)
+				return i;
+		}
+	}
+	return -1;
+}
+/* -----------------------------------------------------------------------------------
 * 설명 : 입력 문자열이 LITTAB에 들어있는지 검사하는 함수이다.
 * 매계 : 토큰 단위로 구분된 literal
 * 반환 : 정상종료 = 해당 literal의 인덱스, 에러 < 0
@@ -386,6 +346,24 @@ int search_literal(char *str)
 {
 	for (int i = 0; i < token_line; i++) {
 		if (strcmp(lit_table[i].literal, str) == 0)
+			return i;
+	}
+	return -1;
+}
+
+/* -----------------------------------------------------------------------------------
+* 설명 : 입력 문자열이 inst_table에 들어있는지 검사하는 함수이다.
+* 매계 : 토큰 단위로 구분된 토큰테이블의 operator
+* 반환 : 정상종료 = 해당 기계어 코드의 인덱스, 에러 < 0
+* 주의 :
+*
+* -----------------------------------------------------------------------------------
+*/
+
+int search_inst(char *str)
+{
+	for (int i = 0; i < inst_index; i++) {
+		if (strcmp(inst_table[i]->operator, str) == 0)
 			return i;
 	}
 	return -1;
@@ -404,10 +382,10 @@ int search_literal(char *str)
 * -----------------------------------------------------------------------------------
 */
 static int assem_pass1(void)
-{	
+{
 	token_line = 0;
 	litcnt = 0;
-	int startaddr = 0, opnum = 0, symnum, j = 0, k = 0, csectnum=0;
+	int startaddr = 0, opnum = 0, symnum, j = 0, k = 0, csectnum = 0;
 	char litbuf[5];
 	char *str = (char*)malloc(sizeof(char) * 128);	//버퍼
 	char *p_token = (char*)malloc(sizeof(char) * 50);		//토큰
@@ -424,32 +402,48 @@ static int assem_pass1(void)
 		lit_table[i].literal[0] = '\0';
 	}
 
-	int i=0;
-	
+	int i = 0;
+
 	if (strcmp(token_table[i]->operator, "START") == 0) {		//프로그램 시작 시
 		locctr = atoi(token_table[i]->operand[0]); //LOCCTR start 주소로 초기화
 		startaddr = locctr;
 		token_table[i]->Addr = locctr;
 		i++;
+		sectaddr[0][0] = startaddr;
 	}
 	else {
 		locctr = 0;
-		}
-	while(strcmp(token_table[i]->operator, "END") != 0){					//프로그램이 끝날 때 까지 루프
+	}
+	while (strcmp(token_table[i]->operator, "END") != 0) {					//프로그램이 끝날 때 까지 루프
 		if (token_table[i]->label[0] != '.') {	//주석이 아닐 경우 
+			if (strcmp(token_table[i]->operator, "CSECT") == 0) {
+				sectaddr[csectnum][1] = locctr;
+				locctr = 0;			//새 섹션 시작 시 LOCCTR 0으로 초기화
+				sym_table[search_symbol(token_table[i]->label)].section = ++csectnum;
+				sym_table[search_symbol(token_table[i]->label)].addr = 0;
+				token_table[i]->Addr = locctr;	//인스트럭션 주소 초기화
+				sectaddr[csectnum][0] = locctr;
+			}
 			if (token_table[i]->label[0] != '\0') {				//label이 존재
 				symnum = search_symbol(token_table[i]->label);
 				if (symnum < 0) {		//SYMTAB에 존재하지 않을 경우				
 					strcpy(sym_table[j].symbol, token_table[i]->label);			//심볼테이블 라벨 저장
-					if (sym_table[symnum].section == csectnum)
-						sym_table[j].addr = locctr;									//심볼테이블 주소 저장
+					sym_table[j].addr = locctr;									//심볼테이블 주소 저장
 					sym_table[j].section = csectnum;							//심볼테이블 섹션번호 저장
-					token_table[i]->Addr =locctr;					//instruction 주소 저장
+					token_table[i]->Addr = locctr;					//instruction 주소 저장
 					j++;
 				}
 				else {             //SYMTAB에 label이 존재할 경우
-					if (sym_table[symnum].section == csectnum)
+					if (sym_table[symnum].section == csectnum) {
 						sym_table[symnum].addr = locctr;			//심볼테이블 주소 저장				//RDREC 주소 저장된다!
+					}
+					else {
+						strcpy(sym_table[j].symbol, token_table[i]->label);
+						sym_table[j].addr = locctr;
+						sym_table[j].section = csectnum;
+						j++;
+					}
+
 					token_table[i]->Addr = locctr;	//instruction 주소 저장		
 				}
 			}
@@ -465,15 +459,15 @@ static int assem_pass1(void)
 								j++;
 							}
 							else {		//SYMTAB에 존재할 경우
-								if(sym_table[symnum].section == csectnum)	//현재 파싱하는 섹션과 심볼테이블에 EXTDEF에 의해 저장된 operand 섹션이 일치할 경우
+								if (sym_table[symnum].section == csectnum)	//현재 파싱하는 섹션과 심볼테이블에 EXTDEF에 의해 저장된 operand 섹션이 일치할 경우
 									sym_table[symnum].addr = locctr;	//해당 심볼 addr에 주소 저장
-								
+
 							}
 						}
 					}
 				}
 				else if (strcmp(token_table[i]->operator, "LTORG") == 0) {		//LTORG 발견 시 LITTAB참조
-					while(lit_table[litcnt].literal[0] != '\0') {	//LTORG 발견까지 LITTAB에 등록된 리터럴 조회 
+					while (lit_table[litcnt].literal[0] != '\0') {	//LTORG 발견까지 LITTAB에 등록된 리터럴 조회 
 						lit_table[litcnt].addr = locctr;			//해당 literal주소 등록
 						locctr += lit_table[litcnt].size;	//literal의 값
 						litcnt++;
@@ -482,7 +476,7 @@ static int assem_pass1(void)
 				else
 					token_table[i]->Addr = locctr;
 			}
-			
+
 			opnum = search_opcode(token_table[i]->operator);
 			if (opnum >= 0) {		//명령어가 맞으면
 				if (inst_table[opnum]->format == 34) {		//
@@ -502,7 +496,7 @@ static int assem_pass1(void)
 				locctr += 3;
 			}
 			else if (strcmp(token_table[i]->operator, "RESW") == 0) {
-				 locctr += 3*(atoi(token_table[i]->operand[0]));
+				locctr += 3 * (atoi(token_table[i]->operand[0]));
 			}
 			else if (strcmp(token_table[i]->operator, "RESB") == 0) {
 				locctr += atoi(token_table[i]->operand[0]);
@@ -510,15 +504,10 @@ static int assem_pass1(void)
 			else if (strcmp(token_table[i]->operator, "BYTE") == 0) {
 				locctr += 1;
 			}
-			else if (strcmp(token_table[i]->operator, "CSECT") == 0) {
-				locctr = 0;			//새 섹션 시작 시 LOCCTR 0으로 초기화
-				sym_table[search_symbol(token_table[i]->label)].section = ++csectnum;
-				sym_table[search_symbol(token_table[i]->label)].addr = 0;
-				token_table[i]->Addr = locctr;	//인스트럭션 주소 초기화
-			}
 			else if (strcmp(token_table[i]->operator, "BYTE") == 0) {
 				locctr += 1;
-			}else if (strcmp(token_table[i]->operator, "EQU") == 0){
+			}
+			else if (strcmp(token_table[i]->operator, "EQU") == 0) {
 				if (token_table[i]->operand[0][0] != '*') {			//*(현재 locctr 값)이 아니라면
 					char op_token[20];			//임시 토큰
 					char *tmp = (char*)malloc(10);
@@ -542,31 +531,44 @@ static int assem_pass1(void)
 					}
 				}
 			}
-			int m = 3, n=0;
+			int m = 3, n = 0;
 			if (token_table[i]->operand[0][0] == '=') {
-				int litnum= search_literal(token_table[i]->operand[0]);
+				int litnum = search_literal(token_table[i]->operand[0]);
 				if (litnum < 0) {	//LITTAB에 없을 경우 (중복 방지)
 					strcpy(lit_table[k].literal, token_table[i]->operand[0]);	//LITTAB에 '='로 시작하는 literal 등록
-					
+
 					while (lit_table[k].literal[m] != '\'') {				//=C또는 =X' 이후(배열[3]부터) '이 나올때까지 
-							litbuf[n++] = lit_table[k].literal[m++];		//한 캐릭터씩 litbuf에 저장
+						litbuf[n++] = lit_table[k].literal[m++];		//한 캐릭터씩 litbuf에 저장
 					}
 					litbuf[n] = '\0';										//끝에 null문자 추가
-					strcpy(lit_table[k].litdata, litbuf);					//literal Data를 추출하여 테이블에 저장
+
+					if (lit_table[k].literal[1] == 'C') {					//=C' ', 캐릭터일 경우
+						int index = 0;
+						char *C_buf[10];
+						while (litbuf[index] != '\0') {
+							C_buf[index] = (char*)malloc(6);
+							sprintf(C_buf[index], "%X", litbuf[index]);     //한글자씩16진수로 출력하여
+							strcat(lit_table[k].litdata, C_buf[index]);     //litdata에 저장
+							index++;
+						}
+					}
+					else
+						strcpy(lit_table[k].litdata, litbuf);					//literal Data를 추출하여 테이블에 저장
+
 					if (strchr(lit_table[k].literal, 'C'))
-						lit_table[k].size = strlen(lit_table[k].litdata); //=C일 경우 캐릭터이므로 1글자당 1바이트
+						lit_table[k].size = (strlen(lit_table[k].litdata) / 2);
 					else
 						lit_table[k].size = (strlen(lit_table[k].litdata) - 1); //=X일 경우 숫자 2캐릭터당 1바이트
 					k++;
 				}
-				
+
 			}
 		}
 		i++;
 	}
 
 	int formatnum;
-	if (strcmp(token_table[token_line-1]->operator, "END") == 0) { //프로그램이 끝났을 경우 LITTAB에 리터럴 주소 등록
+	if (strcmp(token_table[token_line - 1]->operator, "END") == 0) { //프로그램이 끝났을 경우 LITTAB에 리터럴 주소 등록
 		int tmp_locctr = 0;		//임시 로케이션 카운터
 		for (j = litcnt; j < token_line; j++) {
 			if (lit_table[j].literal[0] != '\0') {
@@ -579,11 +581,11 @@ static int assem_pass1(void)
 					tmp_locctr += 2;
 				}
 				lit_table[j].addr = tmp_locctr;
+				sectaddr[csectnum][1] = lit_table[j].addr + lit_table[j].size;
 			}
 		}
 	}
 
-	my_print(litcnt);
 	return 0;
 }
 
@@ -600,8 +602,175 @@ static int assem_pass1(void)
 
 static int assem_pass2(void)
 {
+	int i = 0, instnum = -1, sectnum = 0;
 
-	/* add your code here */
+	while (i < token_line) {
+		int extend = 0, notpc = 0, signcheck = 0;
+		token_table[i]->nixbpe = 0;
+		token_table[i]->obcode = 0;
+		if (token_table[i]->label[0] == '.') {//주석일 경우
+			i++;
+			continue;
+		}
+		if (strcmp(token_table[i]->operator, "CSECT") == 0) {	//다음 섹터참조
+			sectnum++;
+			i++;
+			continue;
+		}
+
+		if (token_table[i]->operator[0] == '+') {		//extended 연산일 경우
+			instnum = search_inst(&(token_table[i]->operator[1])); //첫번째문자+을 뺀 해당 operator가 기계어 명령어인지 확인
+			extend = 1;
+			token_table[i]->nixbpe += 1;
+			notpc = 1;
+		}
+		else
+			instnum = search_inst(token_table[i]->operator);	//해당 operator가 기계어 명령어인지 확인
+
+
+		if (instnum >= 0) {	//명령어가 instruction set에 있는 명령어인지 확인
+			if (inst_table[instnum]->format == 2) {	//2형식일 경우
+				token_table[i]->obcode = inst_table[instnum]->opcode << 8;	//opcode를 shift한 뒤 저장
+				if (inst_table[instnum]->ops == 1) {	//operand가 1개일 경우 
+					for (int j = 0; j < 9; j++) {
+						if (strcmp(token_table[i]->operand[0], reg_table[j]) == 0) {
+							token_table[i]->obcode += j << 4;	//해당 레지스터 번호 저장
+							break;
+						}
+					}
+				}
+				else {  //레지스터를 2개 이상 사용할 경우
+					for (int j = 0; j < 9; j++) {
+						if (strcmp(token_table[i]->operand[0], reg_table[j]) == 0) {
+							token_table[i]->obcode += j << 4;	//첫번째 레지스터 번호 저장
+							break;
+						}
+					}
+					for (int j = 0; j < 9; j++) {
+						if (strcmp(token_table[i]->operand[1], reg_table[j]) == 0) {
+							token_table[i]->obcode += j;	//두번째 레지스터 번호 저장
+							break;
+						}
+					}
+				}
+				i++;
+				continue;
+			}
+			else {//3,4형식일 경우
+				int litnum = -1, litcheck = 0;
+				if (token_table[i]->operand[0][0] == '#') {	//immediate 연산일 경우
+					token_table[i]->nixbpe += 1 << 4;	//ni=01
+					if ('0' <= token_table[i]->operand[0][1] && '9' >= token_table[i]->operand[0][1]) {		//#뒤가 0~9인 숫자일 경우	
+						token_table[i]->obcode += inst_table[instnum]->opcode << 16 | token_table[i]->nixbpe << 12 | atoi(&token_table[i]->operand[0][1]);
+						i++;
+						continue;
+					}
+					else {
+						signcheck = 1;
+					}
+				}
+				else if (token_table[i]->operand[0][0] == '@') {	//indirect 연산일 경우
+					token_table[i]->nixbpe += 1 << 5;	//ni=10
+					signcheck = 1;
+				}
+				else		//SIC/XE 연산
+					token_table[i]->nixbpe += 3 << 4;	//ni=11
+
+				for (int j = 0; j <= inst_table[instnum]->ops; j++) {	//X레지스터를 사용할 경우
+					if (strcmp(token_table[i]->operand[j], "X") == 0) {
+						token_table[i]->nixbpe += 1 << 3;	//indexing 연산
+						break;
+					}
+				}
+
+				if (token_table[i]->operand[0][0] == '\0') {
+					;	//operand가 없을 경우 p=0;
+				}
+				else if (!extend)		//extend가 아니면 PC
+					token_table[i]->nixbpe += 1 << 1;	//PC Relative, p=1;
+
+
+				int symnum = -1;
+				if (signcheck) {
+					symnum = search_symbol(&token_table[i]->operand[0][1]);	//#, @ 기호가 붙을 경우
+				}
+				else if (token_table[i]->operand[0][0] == '=') {	//Literal 연산일 경우
+					litnum = search_literal(token_table[i]->operand[0]);
+					litcheck = 1;
+				}
+				else {
+					symnum = search_symbol(token_table[i]->operand[0]);
+				}
+
+				int reladdr = 0;
+				if (symnum >= 0) {	//operatnd가 심볼테이블에 존재할 경우
+					if (sectnum == sym_table[symnum].section) {		//현재 섹션과 심볼이 정의된 섹션이 같을 경우
+						reladdr = sym_table[symnum].addr - token_table[i]->Addr - 3;		//심볼 주소 - PC 주소
+						if (reladdr < 0)
+							reladdr = 0x0FFF & reladdr;
+					}
+					else
+					{
+						int tmp = -1;
+						tmp = search_symbol2(token_table[i]->operand[0], sectnum);
+						if (tmp >= 0) {
+							reladdr = sym_table[tmp].addr - token_table[i]->Addr - 3;		//심볼 주소 - PC 주소
+							if (reladdr < 0)
+								reladdr = 0x0FFF & reladdr;
+						}
+					}
+
+				}
+				else if (litcheck) {		//literal 연산일 경우
+					reladdr = lit_table[litnum].addr - token_table[i]->Addr - 3;
+				}
+
+
+				if (extend == 1)	//4형식일 경우
+					token_table[i]->obcode += inst_table[instnum]->opcode << 24 | token_table[i]->nixbpe << 20 | reladdr;
+				else
+					token_table[i]->obcode += inst_table[instnum]->opcode << 16 | token_table[i]->nixbpe << 12 | reladdr;
+
+			}
+		}
+		else if (strcmp(token_table[i]->operator, "WORD") == 0) {
+			if ('0' <= token_table[i]->operand[0][0] && '9' >= token_table[i]->operand[0][0]) {		//0~9인 숫자일 경우
+				token_table[i]->obcode = atoi(token_table[i]->operand[0]);
+			}
+			else if (strchr(token_table[i]->operand[0], '+')) {                    //+식일 경우
+				char op_token[10];
+				strcpy(op_token[10], token_table[i]->operand[0]);
+				int tmp = strtok(op_token, "+");
+				int symindex = search_symbol(tmp);//연산기호를 기준으로 토큰 분리
+				if (sectnum == sym_table[symindex].section) {				//첫번째 심볼이 해당 섹션에 정의된 심볼일 경우
+					int opaddr1 = sym_table[symindex].addr;	//첫번째 operand의 주소를 찾아 opaddr1에 대입(SYMTAB활용)
+					tmp = strtok(NULL, "+");						//위와 동일
+					symindex = search_symbol(tmp);
+					if (sectnum == sym_table[symindex].section) {
+						int opaddr2 = sym_table[symindex].addr;
+						token_table[i]->obcode = opaddr1 + opaddr2;		//연산 후의 주소값을 해당 토큰 인스트럭션 주소에 대입
+					}
+				}
+			}
+
+		}
+		else if (strcmp(token_table[i]->operator, "BYTE") == 0) {
+			char litbuf[8];
+			int j = 2, k = 0;
+			while (token_table[i]->operand[0][j] != '\'') {				//=C또는 =X' 이후(배열[3]부터) '이 나올때까지 
+				litbuf[k++] = token_table[i]->operand[0][j++];		//한 캐릭터씩 litbuf에 저장
+			}
+			litbuf[k] = '\0';										//끝에 null문자 추가
+
+			token_table[i]->obcode = strtol(litbuf, NULL, 16);		//X'' 일경우
+		}
+		else {	//기계어 명령어가 아닐 경우
+			i++;
+			continue;
+		}
+		i++;
+	}
+
 	return 0;
 }
 
@@ -617,16 +786,294 @@ static int assem_pass2(void)
 
 void make_objectcode_output(char *file_name)
 {
-	/* add your code here */
+	FILE *FILE = NULL;
+	char *object_code[50];	//obcode
+	char *ref_table[3];
+	int i = 0, j = 0;
+	int sectnum = 0;	//섹션번호
+	int linenum = 0; //object_code의 세로 line, 가로 index
+	int length;
+	int H_check = 0;
+	int T_cnt = 0, T_start = 0;
+	char T_code[100];
+	char *M_code[30];
+	int M_codeindex = 0, M_find = 0, M_len = 0, M_addr = 0, ref_index = -1, ref_index2 = -1;
+	for (int m = 0; m < 10; m++) {
+		M_code[m] = (char*)malloc(30);
+		M_code[m][0] = '\0';
+	}
+	for (; i < token_line; i++) {
+		if (token_table[i]->label[0] == '.') {		//주석
+			continue;
+		}
+		if (strcmp(token_table[i]->operator, "CSECT") == 0) {
+			if (T_code[0] != '\0') {  //섹션이 넘어가는 경우 이전에 썻던 T레코드를 작성
+				sprintf(object_code[linenum], "T%06X%02X%s", T_start, T_cnt / 2, T_code); //T,시작주소,길이,코드 작성
+				T_start = 0;
+				T_cnt = 0;
+				T_code[0] = NULL;
+				linenum++;
+			}
+
+			int m = 0;
+			while (M_code[m][0] != '\0') {    //M레코드의 코드 작성
+				object_code[linenum] = (char*)malloc(70);
+				object_code[linenum][0] = NULL;
+				strcpy(object_code[linenum++], M_code[m++]);
+			}
+
+			for (int m = 0; m < 10; m++) {  //M_코드 초기화
+				M_code[m] = (char*)malloc(30);
+				M_code[m][0] = '\0';
+			}
+			M_codeindex = 0;  //M_code 인덱스 초기화
+
+			object_code[linenum] = (char*)malloc(70);
+			object_code[linenum][0] = NULL;
+			if (sectnum == 0) {
+				sprintf(object_code[linenum++], "E%06X", sectaddr[sectnum][0]); //첫 섹션은 돌아갈 시작주소
+			}
+			else
+				strcpy(object_code[linenum++], "E");  //아니라면 돌아갈 시작주소를 모르기때문에 비움.
+			H_check = 0;
+			sectnum++;
+			continue;
+		}
+		length = 0;
+
+		//H레코드
+		if (H_check == 0) {
+			object_code[linenum] = (char*)malloc(70);
+			length = sprintf(object_code[linenum], "H");
+			if (sectnum == 0)
+				length += sprintf(object_code[linenum] + length, "%-6s", token_table[i]->label); //프로그램 이름
+			else
+				length += sprintf(object_code[linenum] + length, "%-6s", token_table[i - 4]->label); //섹션 이름. 주석크기+EXTREF=3+1=4 총 4만큼떨어져있어 i-5
+			length += sprintf(object_code[linenum] + length, "%06X", sectaddr[sectnum][0]);//시작주소
+			length += sprintf(object_code[linenum] + length, "%06X", sectaddr[sectnum][1] - sectaddr[sectnum][0]); //길이 = 마지막주소-시작주소
+			length = 0;
+			linenum++;
+			H_check = 1;
+		}
+
+		//D레코드
+		if (strcmp(token_table[i]->operator, "EXTDEF") == 0)
+		{
+			object_code[linenum] = (char*)malloc(70);
+			length = sprintf(object_code[linenum], "D");
+			for (int j = 0; j < MAX_OPERAND; j++) {
+				if (token_table[i]->operand[j][0] != '\0') {
+					length += sprintf(object_code[linenum] + length, "%-6s", token_table[i]->operand[j]);
+					length += sprintf(object_code[linenum] + length, "%06X", sym_table[search_symbol(token_table[i]->operand[j])].addr);
+				}
+			}
+			length = 0;
+			linenum++;
+			continue;
+		}
+		else if (strcmp(token_table[i]->operator, "EXTREF") == 0) {  //R레코드
+			object_code[linenum] = (char*)malloc(70);
+			length = sprintf(object_code[linenum], "R");
+			for (int j = 0; j < 3; j++) {
+				ref_table[j] = (char*)malloc(10);
+				ref_table[j][0] = '\0';
+			}
+			for (int j = 0; j < MAX_OPERAND; j++) {
+				if (token_table[i]->operand[j][0] != '\0') {
+					strcpy(ref_table[j], token_table[i]->operand[j]);
+					length += sprintf(object_code[linenum] + length, "%-6s", ref_table[j]);
+				}
+			}
+			length = 0;
+			linenum++;
+			continue;
+		}
+
+		//T레코드
+		object_code[linenum] = (char*)malloc(70);
+		int isinst = search_inst(token_table[i]->operator);
+		int isob = isobcode(token_table[i]->operator);
+		int ob_len = obcode_len(isinst, i);  //해당 obcode의 길이 파악
+		char ref_tmp[10], ref_tmp2[10];
+
+		if (isob == 1) { //obcode가 있는 경우	
+			if (T_cnt + ob_len >= 60) {		//60칼럼 이상일 경우
+				sprintf(object_code[linenum], "T%06X%02X%s", T_start, T_cnt / 2, T_code); //T,시작주소,길이,코드 작성
+				T_start = 0;
+				T_cnt = 0;
+				T_code[0] = NULL;
+				linenum++;
+			}
+			if (T_cnt == 0) { //T레코드 첫 시작주소 판별
+				T_start = token_table[i]->Addr;
+			}
+
+			T_cnt += sprintf(T_code + T_cnt, "%0*X", ob_len, token_table[i]->obcode);
+
+			char op_token[20];			//임시 토큰
+			strcpy(op_token, token_table[i]->operand[0]);	//값을 계산해야하는 operand를 버퍼에 복사
+			char* tmp = (char*)malloc(10);
+			for (int r = 0; r < 3; r++) {
+				if (strcmp(op_token, ref_table[r]) == 0) {  //레퍼런스 테이블에 있는지 확인
+					if (ref_table[r][0] != '\0') {
+						M_len = token_table[i]->Addr + 1;
+						M_find = 1;
+						ref_index = r;
+						break;
+					}
+				}
+				else if (strchr(token_table[i]->operand[0], '-')) {  //ref-ref일 경우
+					tmp = strtok(op_token, "-");					//연산기호를 기준으로 토큰 분리
+					for (int re = 0; re < 3; re++) {
+						if (strcmp(tmp, ref_table[re]) == 0) {  //레퍼런스 테이블에 있는지 확인
+							if (ref_table[r][0] != '\0') {
+								M_len = token_table[i]->Addr;
+								M_find = 2;
+								strcpy(ref_tmp, ref_table[re]);
+								ref_index = re;
+								break;
+							}
+						}
+					}
+					tmp = strtok(NULL, "-");						//두번째 ref
+					for (int re = 0; re < 3; re++) {
+						if (strcmp(tmp, ref_table[re]) == 0) {  //레퍼런스 테이블에 있는지 확인
+							if (ref_table[r][0] != '\0') {
+								M_len = token_table[i]->Addr;
+								strcpy(ref_tmp2, ref_table[re]);
+								ref_index2 = re;
+								break;
+							}
+						}
+					}
+					break;
+				}
+
+			}
+
+		}
+		else if (strcmp(token_table[i]->operator, "RESW") == 0 || strcmp(token_table[i]->operator, "RESW") == 0) { //object_code가 연속적이지 않을 경우
+			if (T_code[0] != NULL) {
+				sprintf(object_code[linenum], "T%06X%02X%s", T_start, T_cnt / 2, T_code); //T,시작주소,길이,코드 작성
+				T_start = 0;
+				T_cnt = 0;
+				T_code[0] = NULL;
+				linenum++;//obcode가 연속적이지 않은 경우
+				continue;
+			}
+		}
+		else if (strcmp(token_table[i]->operator, "LTORG") == 0) {		//LTORG일경우 추가
+			for (; j < litcnt; j++) {
+				if (lit_table[j].addr != -1) {
+					if (T_cnt + lit_table[j].size >= 60) {		//60칼럼 이상일 경우
+						sprintf(object_code[linenum], "T%06X%02X%s", T_start, T_cnt / 2, T_code); //T,시작주소,길이,코드 작성
+						T_start = 0;
+						T_cnt = 0;
+						T_code[0] = NULL;
+						linenum++;
+					}
+					if (T_cnt == 0) { //T레코드 첫 시작주소 판별
+						T_start = lit_table[j].addr;
+					}
+
+					T_cnt += sprintf(T_code + T_cnt, "%s", lit_table[j].litdata);
+				}
+			}
+			sprintf(object_code[linenum], "T%06X%02X%s", T_start, T_cnt / 2, T_code); //T,시작주소,길이,코드 작성
+			T_start = 0;
+			T_cnt = 0;
+			T_code[0] = NULL;
+			linenum++;
+			continue;
+		}
+
+
+		//M레코드
+		object_code[linenum] = (char*)malloc(70);
+		if (M_find == 1) {  //ref를 4형식으로 참조했을 경우
+			M_code[M_codeindex] = (char*)malloc(30);
+			sprintf(M_code[M_codeindex], "M%06X05+%s", M_len, ref_table[ref_index]); //위치,n번째부터참조인지,+,레퍼런스
+			M_codeindex++;
+			M_find = 0;
+		}
+		else if (M_find == 2) { //연산이 있는 m레코드일 경우 ref-ref
+			for (int re = 0; re < 2; re++) {
+				M_code[M_codeindex] = (char*)malloc(30);
+				if (re == 0)
+					sprintf(M_code[M_codeindex], "M%06X06+%s", M_len, ref_tmp); //위치,n번째부터참조인지,+,레퍼런스
+				else
+					sprintf(M_code[M_codeindex], "M%06X06-%s", M_len, ref_tmp2); //위치,n번째부터참조인지,-,레퍼런스
+				M_codeindex++;
+			}
+			M_find = 0;
+		}
+
+
+		//END, 프로그램이 끝났을 때
+		if (strcmp(token_table[i]->operator, "END") == 0) {
+			for (j = litcnt; j < token_line; j++) {
+				if (lit_table[j].addr != -1) {
+					if (T_cnt + lit_table[j].size >= 60) {		//60칼럼 이상일 경우
+						sprintf(object_code[linenum], "T%06X%02X%s", T_start, T_cnt / 2, T_code); //T,시작주소,길이,코드 작성
+						T_start = 0;
+						T_cnt = 0;
+						T_code[0] = NULL;
+						linenum++;
+					}
+					if (T_cnt == 0) { //T레코드 첫 시작주소 판별
+						T_start = lit_table[j].addr;
+					}
+
+					T_cnt += sprintf(T_code + T_cnt, "%s", lit_table[j].litdata);
+					break;
+				}
+			}
+			//마지막T레코드 작성
+			sprintf(object_code[linenum], "T%06X%02X%s", T_start, T_cnt / 2, T_code);
+			linenum++;
+			//마지막M레코드 작성
+			int m = 0;
+			while (M_code[m][0] != '\0') {    //M레코드의 코드 작성
+				object_code[linenum] = (char*)malloc(70);
+				object_code[linenum][0] = NULL;
+				strcpy(object_code[linenum++], M_code[m++]);
+			}
+			//마지막E레코드 작성
+			object_code[linenum] = (char*)malloc(70);
+			if (sectnum == 0) {
+				sprintf(object_code[linenum++], "E%06X", sectaddr[sectnum][0]); //첫 섹션은 돌아갈 시작주소
+			}
+			else
+				strcpy(object_code[linenum++], "E");  //아니라면 돌아갈 시작주소를 모르기때문에 비움.
+
+			object_code[linenum] = (char*)malloc(70);
+			object_code[linenum][0] = '\0';
+		}
+	}
+
+	FILE = fopen(file_name, "w");
+	if (FILE != NULL) {
+		int i = 0;
+		while (object_code[i][0] != '\0') {
+			fprintf(FILE, "%s\n", object_code[i++]);
+		}
+	}
+	fclose(FILE);
 }
 
+/* -----------------------------------------------------------------------------------
+* 설명 : pass1, pass2를 거쳐 만든 immediate Data를 화면으로 출력해주는 함수이다.
+* 매계 : LTORG 연산 후 아직 주소를 배정받지 못한 리터럴들의 첫번재LITTAB 인덱스
+* 반환 : 없음
+* -----------------------------------------------------------------------------------
+*/
 void my_print(int litcnt) {
-	int isop, issym, j=0, count=0;
+	int isop, issym, j = 0, count = 0;
 
 	for (int i = 0; i < line_num; i++) {
 		if (token_table[i]->label[0] == '.')		//주석은 개행 후 스킵
 			continue;
-		
+
 		//Addr 출력
 		if (token_table[i]->Addr != -1) {
 			if (strcmp(token_table[i]->operator, "CSECT") == 0) {
@@ -634,27 +1081,24 @@ void my_print(int litcnt) {
 			}
 			else
 				printf("%04X\t", token_table[i]->Addr);
-
 		}
 		else
 			printf("\t");
-		
+
 		//label 출력
-		//if (token_table[i]->label[0] == '.')		//주석은 개행 후 스킵
-		//	continue;
 		if (token_table[i]->label[0] != '\0')
 			printf("%s	", token_table[i]->label);
 		else
 			printf("\t");
 
 		//operator 출력
-		
 		if (token_table[i]->operator[0] != '\0') {
 			printf("%s	", token_table[i]->operator);
 			if (strcmp(token_table[i]->operator, "LTORG") == 0) {		//LTORG 인 경우
 				for (; j < litcnt; j++) {
 					if (lit_table[j].addr != -1) {
-						printf("\n%04X\t*\t%s\n", lit_table[j].addr, lit_table[j].literal); //LITTAB에 주소값이 배정된 모든 리터럴 출력
+						printf("\n%04X\t*\t%s\t\t\t", lit_table[j].addr, lit_table[j].literal); //LITTAB에 주소값이 배정된 모든 리터럴 출력
+						printf("%s\n", lit_table[j].litdata);
 					}
 				}
 				continue;
@@ -668,16 +1112,85 @@ void my_print(int litcnt) {
 				printf(",%s", token_table[i]->operand[j]);
 			}
 		}
-		printf("\t");
+		printf("\t\t");
+
+		//objectcode 코드 출력
+		int isinst = search_inst(token_table[i]->operator);
+		int isob = isobcode(token_table[i]->operator);
+		if (isob == 1) {
+			if (token_table[i]->operator[0] == '+') {   //4형식
+				printf("%06X", token_table[i]->obcode);
+			}
+			else if (isinst >= 0) {
+				if (inst_table[isinst]->format == 34) { //3형식
+					printf("%06X", token_table[i]->obcode);
+				}
+				else
+					printf("%02X", token_table[i]->obcode);  //2형식
+			}
+			else {
+				if (token_table[i]->obcode == 0)
+					printf("%06X", token_table[i]->obcode);
+				else
+					printf("%02X", token_table[i]->obcode);
+			}
+		}
 
 		//END 후 literal 출력
 		if (strcmp(token_table[i]->operator, "END") == 0) { //프로그램이 끝났을 경우 literal 출력
 			for (j = litcnt; j < token_line; j++) {
 				if (lit_table[j].literal[0] != '\0') {
-					printf("\n%04X\t*\t%s\n", lit_table[j].addr, lit_table[j].literal); //LITTAB에 주소값이 배정된 모든 리터럴 출력
+					printf("\n%04X\t*\t%s\t\t\t", lit_table[j].addr, lit_table[j].literal); //LITTAB에 주소값이 배정된 모든 리터럴 출력
+					printf("%s\n", lit_table[j].litdata);
 				}
 			}
 		}
 		printf("\n");
+	}
+}
+
+/* -----------------------------------------------------------------------------------
+* 설명 : 해당 토큰테이블의 obcode가 출력할 obcode인지 확인해주는 함수이다.
+* 매계 : 생성할 오브젝트 파일명
+* 반환 : 출력할 obcode : 1, 출력하지 말아야할 obcode : 0
+* 주의 :
+*
+* -----------------------------------------------------------------------------------
+*/
+
+int isobcode(char* str) {
+	if (strcmp(str, "EXTDEF") == 0 || strcmp(str, "EXTREF") == 0 || strcmp(str, "RESW") == 0
+		|| strcmp(str, "RESB") == 0 || strcmp(str, "CSECT") == 0 || strcmp(str, "START") == 0
+		|| strcmp(str, "END") == 0 || strcmp(str, "EQU") == 0 || strcmp(str, "LTORG") == 0) {
+		return 0;
+	}
+	return 1;
+}
+
+/* -----------------------------------------------------------------------------------
+* 설명 : 해당 obcode의 형식을 따져 칼럼의 크기를 알려주는 함수이다.
+* 매계 : isinst : inst_table의 index, i : 인덱스
+* 반환 : 해당 obcode의 칼럼 크기
+* 주의 :
+*
+* -----------------------------------------------------------------------------------
+*/
+int obcode_len(int isinst, int i) {
+	char T_code[10];
+	if (token_table[i]->operator[0] == '+') {   //4형식
+		return sprintf(T_code, "%08X", token_table[i]->obcode);
+	}
+	else if (isinst >= 0) {
+		if (inst_table[isinst]->format == 34) { //3형식
+			return sprintf(T_code, "%06X", token_table[i]->obcode);
+		}
+		else
+			return sprintf(T_code, "%02X", token_table[i]->obcode);  //2형식
+	}
+	else {
+		if (token_table[i]->obcode == 0)
+			return sprintf(T_code, "%06X", token_table[i]->obcode);  //값이0인 경우
+		else
+			return sprintf(T_code, "%02X", token_table[i]->obcode);
 	}
 }

@@ -42,6 +42,7 @@ struct token_unit {
 	char *operand[MAX_OPERAND];
 	char *comment;
 	char nixbpe;
+	unsigned int obcode;
 };
 
 typedef struct token_unit token;
@@ -79,6 +80,9 @@ literal lit_table[MAX_LINES];
 int litcnt;
 
 static int locctr;
+
+char *reg_table[9] = { "A", "X", "L", "B", "S", "T", "F", "PC", "SW" };  //레지스터 테이블
+int sectaddr[3][2] = {-1,};  //섹션의 시작주소와 끝주소를 저장하는 배열
 //--------------
 
 static char *input_file;
@@ -88,9 +92,13 @@ int init_inst_file(char *inst_file);
 int init_input_file(char *input_file);
 static int assem_pass1(void);
 static int assem_pass2(void);
+int search_inst(char *str);
 int search_opcode(char *str);
 int search_symbol(char *str);
+int search_symbol2(char *str, int sect);
 int search_literal(char *str);
-void make_opcode_output(char *file_name);
 void make_objectcode_output(char *file_name);
 void my_print(int);
+int isobcode(char* str);
+int obcode_len(int isinst, int i);
+int token_parsing(int index);
